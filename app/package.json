@@ -1,0 +1,34 @@
+{
+  "name": "streamedio-app",
+  "version": "1.0.0",
+  "description": "Low-latency 1080p desktop screen streaming",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "node start.js",
+    "build": "vite build",
+    "package": "vite build && electron-builder"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vite": "^5.0.8",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "io.streamed.app",
+    "productName": "Streamed.io",
+    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "directories": { "output": "release" },
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}
