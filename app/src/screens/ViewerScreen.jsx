@@ -8,12 +8,23 @@ export default function ViewerScreen({ onBack }) {
   const videoRef    = useRef(null);
   const containerRef = useRef(null);
   const hideTimer   = useRef(null);
-  const { joinStream, leaveStream, status, errorMsg } = useViewer();
+  const { joinStream, leaveStream, status, statusDetail, stream, errorMsg } = useViewer();
+
+  // Attach stream to video element once both exist (fixes ontrack race condition)
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+    if (!stream && videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, [stream]);
 
   const handleJoin = () => {
     const trimmed = code.trim();
     if (trimmed.length < 4) return;
-    joinStream(trimmed, videoRef.current);
+    joinStream(trimmed);
   };
 
   const toggleFs = () => {
@@ -67,7 +78,7 @@ export default function ViewerScreen({ onBack }) {
         <div className="viewer-overlay">
           <span className="live-badge-sm"><span className="live-dot" />LIVE</span>
           <div className="viewer-ctrl-group">
-            <button id="btn-fullscreen" className="vctrl-btn" onClick={toggleFs} title={isFs ? 'Exit fullscreen' : 'Fullscreen'}>
+            <button id="btn-fullscreen" className="vctrl-btn" onClick={toggleFs} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
               {isFullscreen ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
@@ -146,6 +157,10 @@ export default function ViewerScreen({ onBack }) {
               ) : 'Join'}
             </button>
           </div>
+          {status === 'connecting' && statusDetail && (
+            <p className="center-label dim" style={{fontSize:'12px',marginTop:'6px'}}>{statusDetail}</p>
+          )}
+
 
           {status === 'error' && (
             <p className="error-msg" role="alert">{errorMsg || 'Failed to join stream.'}</p>

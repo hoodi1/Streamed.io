@@ -90,8 +90,8 @@ export default function StreamerScreen({ onBack }) {
     return (
       <div className="center-screen">
         <p className="error-emoji">⚡</p>
-        <p className="error-title">Stream failed to start</p>
-        <p className="center-label dim">Check VITE_SERVER_URL in app/.env</p>
+        <p className="error-title">Cannot reach signaling server</p>
+        <p className="center-label dim">Make sure the server is running and VITE_SERVER_URL in app/.env is correct</p>
         <button className="btn-secondary" onClick={onBack}>← Go Back</button>
       </div>
     );

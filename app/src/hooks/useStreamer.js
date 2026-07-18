@@ -2,6 +2,13 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { SERVER_URL, ICE_SERVERS, VIDEO_CONSTRAINTS, VIDEO_BITRATE, AUDIO_BITRATE, preferH264 } from '../config.js';
 
+// Bypass ngrok browser interstitial page (required for Socket.IO through ngrok free tier)
+const SOCKET_OPTS = {
+  transports: ['websocket'],
+  reconnection: false,
+  extraHeaders: { 'ngrok-skip-browser-warning': 'true' },
+};
+
 export function useStreamer() {
   const socketRef = useRef(null);
   const peersRef  = useRef({});       // viewerId -> RTCPeerConnection
@@ -93,7 +100,7 @@ export function useStreamer() {
       // Auto-stop if user dismisses the OS screen share dialog
       captureStream.getVideoTracks()[0].onended = () => stopStreaming();
 
-      const socket = io(SERVER_URL, { transports: ['websocket'], reconnection: false });
+      const socket = io(SERVER_URL, SOCKET_OPTS);
       socketRef.current = socket;
 
       socket.on('connect', () => {
