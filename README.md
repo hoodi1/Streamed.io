@@ -1,17 +1,28 @@
 # Streamed.io
 
-Low-latency 1080p/60fps desktop screen streaming app powered by **WebRTC**. No accounts, no chat — just stream and watch.
+Low-latency **1080p / 60fps** desktop screen streaming app powered by **WebRTC**. Built for seamless high-quality screen sharing with friends without complex setups or accounts.
 
 ---
 
-## Project Structure
+## 🚀 Key Features
 
-```
+* **Real-Time P2P Streaming:** Sub-200ms ultra-low latency direct peer-to-peer WebRTC streaming.
+* **1080p / 60fps High Quality:** 8 Mbps H264 hardware-accelerated video pipeline.
+* **Independent Viewer Volume Controls:** Viewers have 1-click **Mute/Unmute** and a smooth **0–100% Volume Slider** directly on the playback overlay to easily balance stream sound with Discord or voice calls.
+* **Stream Audio Modes:** Toggle system audio on or off to suit your setup (e.g. video-only when chatting on Discord).
+* **Screens & Windows Picker:** Organized source selection with application icons and clear screen/window grouping.
+* **NAT Traversal:** Includes Google STUN and OpenRelay TURN configurations to connect across different networks and firewalls.
+
+---
+
+## 📁 Project Structure
+
+```text
 Streamed.io/
-├── server/          ← Signaling server (deploy this)
+├── server/          ← Signaling server (Node.js + Socket.io)
 │   ├── package.json
 │   └── index.js
-└── app/             ← Electron desktop app
+└── app/             ← Electron + React desktop app
     ├── package.json
     ├── .env         ← Set your server URL here
     ├── vite.config.js
@@ -33,7 +44,11 @@ Streamed.io/
 
 ---
 
-## Setup
+## 🛠️ Setup & Running
+
+### Prerequisites
+* **Node.js v20 or higher** (check with `node --version`)
+* Run commands in **Command Prompt or PowerShell** on Windows (avoid WSL/bash for GUI apps)
 
 ### 1. Start the Signaling Server
 
@@ -43,61 +58,39 @@ npm install
 npm start        # runs on port 3001
 ```
 
-For internet access, deploy this to a VPS (Railway, Render, Fly.io, etc).  
-Free options: [Railway](https://railway.app) or [Render](https://render.com)
+For remote connections over the internet, deploy the server to [Railway](https://railway.app) or use [ngrok](https://ngrok.com) (`ngrok http 3001`).
 
 ### 2. Configure the App
 
 Edit `app/.env`:
 ```env
-VITE_SERVER_URL=https://your-deployed-server.com
+VITE_SERVER_URL=https://your-signaling-server.ngrok-free.app
 ```
-For local dev, leave it as `http://localhost:3001`.
 
-### 3. Run the App (Development)
+### 3. Run the Desktop App
 
 ```bash
 cd app
 npm install
-npm run dev
+node start.js
 ```
-
-This starts Vite + Electron together.
-
-### 4. Package for Distribution
-
-```bash
-cd app
-npm run package
-```
-
-Output: `app/release/` — Windows NSIS installer.
 
 ---
 
-## How It Works
+## 📖 Usage Guide
 
-1. **Streamer** → clicks "Go Live" → picks a screen → gets a 6-char room code
-2. **Viewer** → clicks "Watch Stream" → types the room code → stream starts playing
+* **Streamer Guide:** See [STREAMER.md](./STREAMER.md) for hosting and ngrok setup instructions.
+* **Viewer Guide:** See [VIEWER.md](./VIEWER.md) for joining streams and using overlay controls.
 
-After the initial WebRTC handshake (via the signaling server), **all video/audio travels directly P2P** between streamer and viewer — the signaling server is never involved again.
+---
 
-### Quality
+## ⚡ Technical Specifications
 
-| Setting | Value |
+| Feature | Specification |
 |---|---|
-| Resolution | 1920×1080 |
-| Frame Rate | 60 fps |
-| Video Bitrate | 8 Mbps (H264) |
-| Audio | System loopback (Windows) / 320 kbps |
-| Protocol | WebRTC with TURN fallback |
-
----
-
-## Internet Connectivity
-
-For viewers outside your local network, the app uses:
-- **Google STUN** servers — for most direct P2P connections
-- **OpenRelay TURN** servers — as a fallback for strict NATs
-
-For production, replace OpenRelay with your own TURN server (e.g. [coturn](https://github.com/coturn/coturn) or [Metered](https://metered.ca)) in `app/src/config.js`.
+| **Max Resolution** | 1920 × 1080 |
+| **Target Frame Rate** | 60 fps |
+| **Video Bitrate** | 8 Mbps (H264) |
+| **Audio Bitrate** | 320 kbps (Opus) |
+| **Viewer Controls** | Mute/Unmute, Volume Slider (0–100%), Fullscreen |
+| **Protocols** | WebSockets (signaling) + WebRTC P2P (media) |
