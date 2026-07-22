@@ -13,6 +13,9 @@ export function useStreamer() {
   const socketRef = useRef(null);
   const peersRef  = useRef({});       // viewerId -> RTCPeerConnection
   const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const processAudioCleanupRef = useRef(null);
+
   const [roomCode,    setRoomCode]    = useState(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [status,      setStatus]      = useState('idle'); // idle|connecting|live|error
@@ -61,57 +64,103 @@ export function useStreamer() {
     socketRef.current?.emit('offer', { to: viewerId, offer });
   }, [applyMaxBitrate]);
 
-  const startStreaming = useCallback(async (sourceId, includeAudio = false) => {
+  const startStreaming = useCallback(async (sourceInput, includeAudio = false) => {
     setStatus('connecting');
     try {
-      // Capture screen. Audio loopback is opt-in (off by default to avoid Discord echo).
+      const sourceId = typeof sourceInput === 'object' ? sourceInput.id : sourceInput;
+      const sourceType = typeof sourceInput === 'object' ? sourceInput.type : (sourceId.startsWith('screen:') ? 'screen' : 'window');
+      const pid = typeof sourceInput === 'object' ? sourceInput.pid : null;
+
       let captureStream;
-      if (includeAudio) {
-        try {
-          captureStream = await navigator.mediaDevices.getUserMedia({
-            audio: { mandatory: { chromeMediaSource: 'desktop' } },
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sourceId,
-                maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
-                maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
-                maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
-                minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
-              },
-            },
-          });
-        } catch {
-          console.warn('System audio unavailable — falling back to video only');
-          captureStream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sourceId,
-                maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
-                maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
-                maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
-              },
-            },
-          });
-        }
-      } else {
-        // Audio OFF — video only (prevents Discord/voice chat echo)
-        captureStream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
-              maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
-              maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
-              maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
-              minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
-            },
+
+      // Always capture video first
+      captureStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId,
+            maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
+            maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
+            maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
+            minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
           },
-        });
+        },
+      });
+
+      // Handle Audio options
+      if (includeAudio) {
+        if (sourceType === 'window' && pid && window.electronAPI?.startProcessAudio) {
+          // Process-Isolated Audio (WASAPI Process Loopback targeting ONLY this window PID)
+          console.log(`[Streamer] Starting WASAPI Process Audio Capture for PID: ${pid}`);
+          try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+            audioCtxRef.current = audioCtx;
+            const destination = audioCtx.createMediaStreamDestination();
+
+            const sampleQueue = [];
+            const bufferSize = 4096;
+            const scriptNode = audioCtx.createScriptProcessor(bufferSize, 2, 2);
+
+            scriptNode.onaudioprocess = (e) => {
+              const leftChannel = e.outputBuffer.getChannelData(0);
+              const rightChannel = e.outputBuffer.getChannelData(1);
+
+              for (let i = 0; i < bufferSize; i++) {
+                if (sampleQueue.length >= 2) {
+                  leftChannel[i] = sampleQueue.shift() / 32768.0;
+                  rightChannel[i] = sampleQueue.shift() / 32768.0;
+                } else {
+                  leftChannel[i] = 0;
+                  rightChannel[i] = 0;
+                }
+              }
+            };
+
+            scriptNode.connect(destination);
+
+            const removeListener = window.electronAPI.onProcessAudioData((chunk) => {
+              const buffer = chunk.buffer || chunk;
+              const int16Array = new Int16Array(buffer, chunk.byteOffset || 0, Math.floor(chunk.byteLength / 2));
+              for (let i = 0; i < int16Array.length; i++) {
+                sampleQueue.push(int16Array[i]);
+              }
+              if (sampleQueue.length > 48000) {
+                sampleQueue.splice(0, sampleQueue.length - 24000);
+              }
+            });
+
+            window.electronAPI.startProcessAudio(pid);
+
+            const processAudioTrack = destination.stream.getAudioTracks()[0];
+            if (processAudioTrack) {
+              captureStream.addTrack(processAudioTrack);
+            }
+
+            processAudioCleanupRef.current = () => {
+              removeListener?.();
+              scriptNode.disconnect();
+              window.electronAPI.stopProcessAudio();
+              if (audioCtx.state !== 'closed') audioCtx.close();
+            };
+          } catch (e) {
+            console.error('[Streamer] Failed to initialize WASAPI process audio:', e);
+          }
+        } else {
+          // System-wide desktop loopback audio
+          try {
+            const systemAudioStream = await navigator.mediaDevices.getUserMedia({
+              audio: { mandatory: { chromeMediaSource: 'desktop' } },
+              video: false,
+            });
+            const sysAudioTrack = systemAudioStream.getAudioTracks()[0];
+            if (sysAudioTrack) captureStream.addTrack(sysAudioTrack);
+          } catch (e) {
+            console.warn('[Streamer] System audio loopback unavailable:', e);
+          }
+        }
       }
+
       streamRef.current = captureStream;
 
       // Auto-stop if user dismisses the OS screen share dialog
@@ -151,6 +200,10 @@ export function useStreamer() {
   }, [createPeerForViewer]);
 
   const stopStreaming = useCallback(() => {
+    if (processAudioCleanupRef.current) {
+      processAudioCleanupRef.current();
+      processAudioCleanupRef.current = null;
+    }
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     Object.values(peersRef.current).forEach((pc) => pc.close());

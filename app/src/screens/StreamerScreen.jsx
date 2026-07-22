@@ -159,7 +159,7 @@ export default function StreamerScreen({ onBack }) {
                   <button
                     key={src.id}
                     className="source-card"
-                    onClick={() => startStreaming(src.id, includeAudio)}
+                    onClick={() => startStreaming(src, includeAudio)}
                     title={src.name}
                   >
                     <div className="source-thumb-wrap">
@@ -182,14 +182,14 @@ export default function StreamerScreen({ onBack }) {
             <div className="source-section">
               <h3 className="source-section-title">⬜ Application Windows</h3>
               {includeAudio && (
-                <p className="source-audio-note">⚠️ Audio is system-wide — window-specific audio is not supported by the OS</p>
+                <p className="source-audio-note">🎯 Isolated Window Audio — Captures sound ONLY from this application, ignoring Discord & desktop apps</p>
               )}
               <div className="sources-grid">
                 {windows.map((src) => (
                   <button
                     key={src.id}
                     className="source-card"
-                    onClick={() => startStreaming(src.id, includeAudio)}
+                    onClick={() => startStreaming(src, includeAudio)}
                     title={src.name}
                   >
                     <div className="source-thumb-wrap">
