@@ -41,10 +41,12 @@ ipcMain.handle('get-sources', async () => {
     fetchWindowIcons: true,
   });
   return sources.map((s) => ({
-    id: s.id,
-    name: s.name,
+    id:        s.id,
+    name:      s.name,
     thumbnail: s.thumbnail.toDataURL(),
     display_id: s.display_id,
+    type:      s.id.startsWith('screen:') ? 'screen' : 'window',
+    appIcon:   s.appIcon ? s.appIcon.toDataURL() : null,
   }));
 });
 

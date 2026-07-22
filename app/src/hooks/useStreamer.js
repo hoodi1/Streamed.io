@@ -61,27 +61,43 @@ export function useStreamer() {
     socketRef.current?.emit('offer', { to: viewerId, offer });
   }, [applyMaxBitrate]);
 
-  const startStreaming = useCallback(async (sourceId) => {
+  const startStreaming = useCallback(async (sourceId, includeAudio = false) => {
     setStatus('connecting');
     try {
-      // Capture screen + system audio (Windows loopback). Falls back to video-only.
+      // Capture screen. Audio loopback is opt-in (off by default to avoid Discord echo).
       let captureStream;
-      try {
-        captureStream = await navigator.mediaDevices.getUserMedia({
-          audio: { mandatory: { chromeMediaSource: 'desktop' } },
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
-              maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
-              maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
-              maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
-              minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
+      if (includeAudio) {
+        try {
+          captureStream = await navigator.mediaDevices.getUserMedia({
+            audio: { mandatory: { chromeMediaSource: 'desktop' } },
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId,
+                maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
+                maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
+                maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
+                minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
+              },
             },
-          },
-        });
-      } catch {
-        console.warn('System audio unavailable — streaming video only');
+          });
+        } catch {
+          console.warn('System audio unavailable — falling back to video only');
+          captureStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId,
+                maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
+                maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
+                maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
+              },
+            },
+          });
+        }
+      } else {
+        // Audio OFF — video only (prevents Discord/voice chat echo)
         captureStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
@@ -91,6 +107,7 @@ export function useStreamer() {
               maxWidth:     VIDEO_CONSTRAINTS.maxWidth,
               maxHeight:    VIDEO_CONSTRAINTS.maxHeight,
               maxFrameRate: VIDEO_CONSTRAINTS.maxFrameRate,
+              minFrameRate: VIDEO_CONSTRAINTS.minFrameRate,
             },
           },
         });

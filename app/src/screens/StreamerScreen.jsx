@@ -5,7 +5,11 @@ export default function StreamerScreen({ onBack }) {
   const [sources, setSources]           = useState([]);
   const [loadingSources, setLoading]    = useState(true);
   const [copied, setCopied]             = useState(false);
+  const [includeAudio, setIncludeAudio] = useState(false);
   const { startStreaming, stopStreaming, roomCode, viewerCount, status } = useStreamer();
+
+  const screens = sources.filter(s => s.type === 'screen');
+  const windows = sources.filter(s => s.type === 'window');
 
   const loadSources = async () => {
     setLoading(true);
@@ -117,6 +121,23 @@ export default function StreamerScreen({ onBack }) {
         </button>
       </div>
 
+      <div className="audio-toggle-row">
+        <label className="audio-toggle-label" htmlFor="toggle-audio">
+          <span>🔊 Include system audio</span>
+          <span className="audio-toggle-hint">
+            {includeAudio ? 'ON — turn OFF if using Discord/voice chat to avoid echo' : 'OFF — safe for use with Discord or other voice apps'}
+          </span>
+        </label>
+        <button
+          id="toggle-audio"
+          className={`toggle-btn ${includeAudio ? 'toggle-on' : 'toggle-off'}`}
+          onClick={() => setIncludeAudio(v => !v)}
+          aria-pressed={includeAudio}
+        >
+          <span className="toggle-thumb" />
+        </button>
+      </div>
+
       {loadingSources ? (
         <div className="center-screen">
           <div className="spinner" />
@@ -128,26 +149,68 @@ export default function StreamerScreen({ onBack }) {
           <button className="btn-secondary" onClick={loadSources}>Try Again</button>
         </div>
       ) : (
-        <div className="sources-grid">
-          {sources.map((src) => (
-            <button
-              key={src.id}
-              className="source-card"
-              onClick={() => startStreaming(src.id)}
-              title={src.name}
-            >
-              <div className="source-thumb-wrap">
-                <img src={src.thumbnail} alt={src.name} className="source-thumb" draggable={false} />
-                <div className="source-hover-veil">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
-                  </svg>
-                  Stream this
-                </div>
+        <div className="sources-wrap">
+
+          {screens.length > 0 && (
+            <div className="source-section">
+              <h3 className="source-section-title">🖥 Entire Screen</h3>
+              <div className="sources-grid">
+                {screens.map((src) => (
+                  <button
+                    key={src.id}
+                    className="source-card"
+                    onClick={() => startStreaming(src.id, includeAudio)}
+                    title={src.name}
+                  >
+                    <div className="source-thumb-wrap">
+                      <img src={src.thumbnail} alt={src.name} className="source-thumb" draggable={false} />
+                      <div className="source-hover-veil">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
+                        </svg>
+                        Stream this
+                      </div>
+                    </div>
+                    <span className="source-name">{src.name}</span>
+                  </button>
+                ))}
               </div>
-              <span className="source-name">{src.name}</span>
-            </button>
-          ))}
+            </div>
+          )}
+
+          {windows.length > 0 && (
+            <div className="source-section">
+              <h3 className="source-section-title">⬜ Application Windows</h3>
+              {includeAudio && (
+                <p className="source-audio-note">⚠️ Audio is system-wide — window-specific audio is not supported by the OS</p>
+              )}
+              <div className="sources-grid">
+                {windows.map((src) => (
+                  <button
+                    key={src.id}
+                    className="source-card"
+                    onClick={() => startStreaming(src.id, includeAudio)}
+                    title={src.name}
+                  >
+                    <div className="source-thumb-wrap">
+                      <img src={src.thumbnail} alt={src.name} className="source-thumb" draggable={false} />
+                      {src.appIcon && (
+                        <img src={src.appIcon} alt="" className="source-app-icon" aria-hidden="true" />
+                      )}
+                      <div className="source-hover-veil">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
+                        </svg>
+                        Stream this
+                      </div>
+                    </div>
+                    <span className="source-name">{src.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>
